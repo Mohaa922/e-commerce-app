@@ -1,13 +1,11 @@
 pipeline {
-    agent any
+    agent { label 'vm2-agent' } // pour forcer l’agent VM2
 
     environment {
-        DOCKER_IMAGE = "ecommerce-app"
-        DOCKER_TAG = "latest"
+        DOCKER_IMAGE = 'ecommerce-app:latest'
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 git branch: 'master', url: 'https://github.com/Mohaa922/e-commerce-app.git'
@@ -22,36 +20,31 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-            }
-        }
-
-        stage('Push Docker Image (optionnel)') {
-            when {
-                expression { return env.DOCKER_HUB_USERNAME != null }
-            }
-            steps {
-                withCredentials([string(credentialsId: 'docker-hub-password', variable: 'DOCKER_HUB_PASSWORD')]) {
-                    sh "echo $DOCKER_HUB_PASSWORD | docker login -u ${DOCKER_HUB_USERNAME} --password-stdin"
-                    sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_HUB_USERNAME}/${DOCKER_IMAGE}:${DOCKER_TAG}"
-                    sh "docker push ${DOCKER_HUB_USERNAME}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+                script {
+                    sh 'docker build -t $DOCKER_IMAGE .'
                 }
             }
         }
 
-        stage('Deploy (optionnel)') {
+        stage('Run Docker Container (optionnel)') {
             steps {
-                echo 'Déploiement à définir…'
+                script {
+                    // on arrête le container précédent s’il existe
+                    sh 'docker rm -f ecommerce-container || true'
+                    // on lance le container
+                    sh 'docker run -d --name ecommerce-container -p 8080:8080 $DOCKER_IMAGE'
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline terminé avec succès 🎉'
+            echo '✅ Pipeline terminé avec succès.'
         }
         failure {
-            echo 'Pipeline échoué ❌'
+            echo '❌ Pipeline échoué.'
         }
     }
 }
+
